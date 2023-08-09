@@ -20,12 +20,6 @@ func dataRequest() *schema.Resource {
 				Description: "HTTP Request URL",
 				Required:    true,
 			},
-			"headers": {
-				Type:        schema.TypeMap,
-				Optional:    true,
-				Default:     make(map[string]interface{}),
-				Description: "HTTP Request Header",
-			},
 			"screenshot": {
 				Type:         schema.TypeMap,
 				Optional:     true,

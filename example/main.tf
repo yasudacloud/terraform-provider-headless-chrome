@@ -9,9 +9,6 @@ terraform {
 
 data "headless_chrome_request" "example" {
   url     = "http://localhost:5555/"
-  headers = {
-    "Content-Type" : "application/json"
-  }
   screenshot = {
     dist_path = var.dist_path
     file_name = var.file_name
