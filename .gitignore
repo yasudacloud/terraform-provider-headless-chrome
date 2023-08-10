@@ -29,7 +29,8 @@ vendor
 example/*.tfvars
 terraform-provider-template
 terraform-provider-headless-chrome
-
+.terraform.lock.hcl
+.terraform
 # Test exclusions
 !command/test-fixtures/**/*.tfstate
 !command/test-fixtures/**/.terraform/
