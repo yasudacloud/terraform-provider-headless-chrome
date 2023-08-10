@@ -1,11 +1,16 @@
 package provider
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"github.com/chromedp/cdproto/emulation"
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/chromedp"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"image"
+	"image/png"
 	"io/ioutil"
 	"log"
 	"os"
@@ -13,7 +18,7 @@ import (
 
 func dataRequest() *schema.Resource {
 	return &schema.Resource{
-		Read: dataRequestRead,
+		ReadContext: dataRequestRead,
 		Schema: map[string]*schema.Schema{
 			"url": {
 				Type:        schema.TypeString,
@@ -38,6 +43,16 @@ func dataRequest() *schema.Resource {
 					return warnings, errors
 				},
 			},
+			"width": {
+				Type:        schema.TypeInt,
+				Optional:    true,
+				Description: "Window Width",
+			},
+			"height": {
+				Type:        schema.TypeInt,
+				Optional:    true,
+				Description: "Window Height",
+			},
 			"body": {
 				Type:        schema.TypeString,
 				Optional:    true,
@@ -60,34 +75,54 @@ func dataRequest() *schema.Resource {
 	}
 }
 
-func dataRequestRead(d *schema.ResourceData, _ interface{}) error {
+func dataRequestRead(c context.Context, d *schema.ResourceData, _ interface{}) diag.Diagnostics {
+	var iWidth int
+	var iHeight int
+
 	ctx, cancel := chromedp.NewContext(context.Background(), chromedp.WithDebugf(log.Printf))
 	defer cancel()
-	var responseReceived *network.EventResponseReceived
+	var httpResponse *network.EventResponseReceived
 	chromedp.ListenTarget(ctx, func(ev interface{}) {
 		switch ev := ev.(type) {
 		case *network.EventResponseReceived:
-			responseReceived = ev
+			httpResponse = ev
 		}
 	})
 	var htmlContent string
 	var imageBuf []byte
 	var screenshotAttr, isScreenShot = d.GetOk("screenshot")
 	url := d.Get("url").(string)
-	useragent := d.Get("useragent").(string)
 
 	actions := []chromedp.Action{
 		network.Enable(),
 	}
-	if useragent != "" {
-		actions = append(actions, network.SetExtraHTTPHeaders(network.Headers{
-			"User-Agent": useragent,
-		}))
+
+	if useragent := d.Get("useragent").(string); useragent != "" {
+		actions = append(
+			actions,
+			emulation.SetUserAgentOverride(useragent),
+		)
 	}
-	actions = append(actions, chromedp.Navigate(url), chromedp.OuterHTML(`html`, &htmlContent))
+
+	width, wOk := d.GetOk("width")
+	height, hOk := d.GetOk("height")
+	if wOk && hOk {
+		iWidth = width.(int)
+		iHeight = height.(int)
+	} else if (wOk && !hOk) || (!wOk && hOk) {
+		return diag.Errorf("'width' and 'height' must both be set or both be unset")
+	} else {
+		iWidth = 1280
+		iHeight = 768
+	}
+	actions = append(actions,
+		chromedp.EmulateViewport(int64(iWidth), int64(iHeight)),
+		chromedp.Navigate(url),
+		chromedp.OuterHTML(`html`, &htmlContent),
+	)
 
 	if isScreenShot {
-		actions = append(actions, chromedp.Screenshot(`html`, &imageBuf, chromedp.NodeVisible, chromedp.ByQuery))
+		actions = append(actions, chromedp.Screenshot("html", &imageBuf, chromedp.NodeVisible, chromedp.ByQuery))
 	}
 	err := chromedp.Run(ctx, actions...)
 	if err != nil {
@@ -95,12 +130,28 @@ func dataRequestRead(d *schema.ResourceData, _ interface{}) error {
 	} else {
 		d.SetId(url)
 		d.Set("body", htmlContent)
-		if responseReceived != nil {
-			d.Set("status_code", responseReceived.Response.Status)
-			d.Set("response_headers", responseReceived.Response.Headers)
+		if httpResponse != nil {
+			d.Set("status_code", httpResponse.Response.Status)
+			d.Set("response_headers", httpResponse.Response.Headers)
 		}
 	}
 	if isScreenShot {
+		img, _, err := image.Decode(bytes.NewReader(imageBuf))
+		if err != nil {
+			return diag.Errorf(err.Error())
+		}
+		rect := image.Rect(0, 0, iWidth, iHeight)
+		trimmed := img.(interface {
+			SubImage(r image.Rectangle) image.Image
+		}).SubImage(rect)
+
+		var buf bytes.Buffer
+		if err := png.Encode(&buf, trimmed); err != nil {
+			print("@error image")
+			return diag.Errorf("resize image error")
+		}
+		imageBuf = buf.Bytes()
+
 		m := screenshotAttr.(map[string]interface{})
 		var distPath = m["dist_path"].(string)
 		var fileName = m["file_name"].(string)
@@ -111,6 +162,7 @@ func dataRequestRead(d *schema.ResourceData, _ interface{}) error {
 	}
 	return nil
 }
+
 func validateScreenShotAttribute(v interface{}, key string) (warnings []string, errors []error) {
 	m, ok := v.(map[string]interface{})
 	if !ok {

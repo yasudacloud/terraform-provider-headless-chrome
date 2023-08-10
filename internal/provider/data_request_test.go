@@ -42,6 +42,14 @@ func TestAccDataRequest(t *testing.T) {
 					resource.TestCheckResourceAttr(name, "status_code", "200"),
 				),
 			},
+			{
+				Config:      testCase8,
+				ExpectError: regexp.MustCompile("'width' and 'height' must both be set or both be unset"),
+			},
+			{
+				Config:      testCase9,
+				ExpectError: regexp.MustCompile("'width' and 'height' must both be set or both be unset"),
+			},
 		},
 	})
 }
@@ -98,6 +106,20 @@ data "headless_chrome_request" "example2" {
  provider = "headless-chrome"
  url      = "https://yasudacloud.github.io"
  useragent  = "123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123"
+}
+`
+	testCase8 = `
+data "headless_chrome_request" "example2" {
+ provider = "headless-chrome"
+ url      = "https://yasudacloud.github.io"
+ height   = 600
+}
+`
+	testCase9 = `
+data "headless_chrome_request" "example2" {
+ provider = "headless-chrome"
+ url      = "https://yasudacloud.github.io"
+ width = 300
 }
 `
 )
