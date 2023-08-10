@@ -27,6 +27,17 @@ func dataRequest() *schema.Resource {
 				Description:  "ScreenShot Setting",
 				ValidateFunc: validateScreenShotAttribute,
 			},
+			"useragent": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "HTTP Request Header User Agent",
+				ValidateFunc: func(i interface{}, s string) (warnings []string, errors []error) {
+					if value := i.(string); len(value) > 512 {
+						errors = append(errors, fmt.Errorf("upper limit is 512 characters"))
+					}
+					return warnings, errors
+				},
+			},
 			"body": {
 				Type:        schema.TypeString,
 				Optional:    true,
@@ -63,12 +74,18 @@ func dataRequestRead(d *schema.ResourceData, _ interface{}) error {
 	var imageBuf []byte
 	var screenshotAttr, isScreenShot = d.GetOk("screenshot")
 	url := d.Get("url").(string)
+	useragent := d.Get("useragent").(string)
 
 	actions := []chromedp.Action{
 		network.Enable(),
-		chromedp.Navigate(url),
-		chromedp.OuterHTML(`html`, &htmlContent),
 	}
+	if useragent != "" {
+		actions = append(actions, network.SetExtraHTTPHeaders(network.Headers{
+			"User-Agent": useragent,
+		}))
+	}
+	actions = append(actions, chromedp.Navigate(url), chromedp.OuterHTML(`html`, &htmlContent))
+
 	if isScreenShot {
 		actions = append(actions, chromedp.Screenshot(`html`, &imageBuf, chromedp.NodeVisible, chromedp.ByQuery))
 	}

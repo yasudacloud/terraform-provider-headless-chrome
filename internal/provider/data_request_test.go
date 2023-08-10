@@ -18,9 +18,6 @@ func TestAccDataRequest(t *testing.T) {
 			{
 				Config:      testCase2,
 				ExpectError: regexp.MustCompile("Incorrect attribute value type"),
-				//Check: resource.ComposeTestCheckFunc(
-				//	resource.TestCheckResourceAttr(name, "url", "https://yasudacloud.github.io"),
-				//),
 			},
 			{
 				Config:      testCase3,
@@ -33,6 +30,10 @@ func TestAccDataRequest(t *testing.T) {
 			{
 				Config:      testCase5,
 				ExpectError: regexp.MustCompile("key 'dist_path' is a directory that does not exist"),
+			},
+			{
+				Config:      testCase7,
+				ExpectError: regexp.MustCompile("upper limit is 512 characters"),
 			},
 			{
 				Config: testCase6,
@@ -90,6 +91,13 @@ data "headless_chrome_request" "example" {
 data "headless_chrome_request" "example" {
  provider = "headless-chrome"
  url      = "https://yasudacloud.github.io"
+}
+`
+	testCase7 = `
+data "headless_chrome_request" "example2" {
+ provider = "headless-chrome"
+ url      = "https://yasudacloud.github.io"
+ useragent  = "123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123"
 }
 `
 )
