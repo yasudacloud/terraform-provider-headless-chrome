@@ -34,3 +34,6 @@ terraform-provider-headless-chrome
 # Test exclusions
 !command/test-fixtures/**/*.tfstate
 !command/test-fixtures/**/.terraform/
+example
+example/*
+
